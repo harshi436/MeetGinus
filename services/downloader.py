@@ -3,8 +3,7 @@ import os
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
-
+load_dotenv(override=True)
 
 def download_mp3(url: str, bot_id: str, recordings_dir: str) -> str:
     """

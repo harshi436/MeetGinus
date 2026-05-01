@@ -1,5 +1,6 @@
 import os
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+import uuid
+from datetime import datetime
 
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
@@ -8,8 +9,7 @@ from config.config import SCOPES, GOOGLE_REDIRECT_URI
 from auth.token_service import save_token
 from db.mongo import user_collection
 
-import uuid
-from datetime import datetime
+# os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 flow_store = {}
 
@@ -22,7 +22,9 @@ def create_flow():
     )
 
 
-# 🔹 LOGIN (NO user_id now)
+# =========================
+# LOGIN
+# =========================
 def get_auth_url():
     flow = create_flow()
 
@@ -31,70 +33,47 @@ def get_auth_url():
         prompt="consent"
     )
 
-    flow_store[state] = {
-        "flow": flow
-    }
+    flow_store[state] = flow
 
-    print("LOGIN STATE:", state)
+    print("🔥 LOGIN STATE:", state)
 
     return auth_url
 
 
-# # 🔹 CALLBACK
+# =========================
+# CALLBACK (FIXED - NO LOOP)
+# =========================
 def handle_callback(full_url: str, state: str):
 
-    stored = flow_store.get(state)
+    if state not in flow_store:
+        return {"error": "Session expired. Please login again"}
 
-    if not stored:
-        return {"error": "❌ Invalid or expired state"}
+    flow = flow_store[state]
 
-    flow = stored["flow"]
-
+    # exchange code
     flow.fetch_token(authorization_response=full_url)
-
     creds = flow.credentials
 
-    # =========================
-    # ✅ GET USER EMAIL FROM GOOGLE
-    # =========================
+    # get user info
     service = build("oauth2", "v2", credentials=creds)
     user_info = service.userinfo().get().execute()
 
     email = user_info.get("email")
 
-    print("📧 EMAIL FROM GOOGLE:", email)   # ✅ DEBUG
-
-    # =========================
-    # ✅ CHECK USER IN DB
-    # =========================
+    # check user
     user = user_collection.find_one({"email": email})
 
     if user:
         user_id = user["user_id"]
-
-        # 🔥 OPTIONAL FIX (if old user had no email)
-        user_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {"email": email}}
-        )
-
-        print("✅ EXISTING USER:", email)
-
     else:
         user_id = str(uuid.uuid4())
-
-        # 🔥 THIS CREATES users COLLECTION
         user_collection.insert_one({
             "user_id": user_id,
             "email": email,
             "created_at": datetime.utcnow()
         })
 
-        print("🆕 NEW USER CREATED:", email)
-
-    # =========================
-    # ✅ SAVE TOKEN WITH USER_ID + EMAIL
-    # =========================
+    # save token
     token_data = {
         "access_token": creds.token,
         "refresh_token": creds.refresh_token,
@@ -102,19 +81,19 @@ def handle_callback(full_url: str, state: str):
         "client_id": creds.client_id,
         "client_secret": creds.client_secret,
         "scopes": creds.scopes,
-        "email": email   # 🔥 ADD THIS
+        "email": email
     }
 
-    # 🔥 PASS EMAIL ALSO
     save_token(user_id, token_data)
 
-    # =========================
-    # CLEANUP
-    # =========================
+    # cleanup
     del flow_store[state]
 
+    print("✅ LOGIN SUCCESS:", email)
+
+    # 🚨 IMPORTANT: RETURN ONLY DATA (NO REDIRECT LOOP)
     return {
-        "message": "✅ Google Connected Successfully",
+        "message": "Login successful",
         "user_id": user_id,
         "email": email
     }

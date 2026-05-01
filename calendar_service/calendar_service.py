@@ -1,41 +1,73 @@
 from googleapiclient.discovery import build
 import uuid
+from datetime import datetime, timedelta
+
+
+def extract_meet_link(event):
+    """SAFE extract Meet link"""
+    if event.get("hangoutLink"):
+        return event["hangoutLink"]
+
+    conf = event.get("conferenceData", {})
+    for ep in conf.get("entryPoints", []):
+        if ep.get("entryPointType") == "video":
+            return ep.get("uri")
+
+    return None
+
 
 def create_meeting(creds, title, date, time):
-    """
-    Creates a Google Calendar event and returns both the 
-    Meeting URL and the Event ID.
-    """
-    # 1. Build the Google Calendar service using your credentials
+
     service = build("calendar", "v3", credentials=creds)
 
-    # 2. Format the start and end time (using the same for both as a placeholder)
-    start_time = f"{date}T{time}:00"
-    
-    # 3. Define the event details
+    start_dt = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
+    end_dt = start_dt + timedelta(minutes=30)
+
     event_body = {
-        "summary": title,
-        "start": {"dateTime": start_time, "timeZone": "Asia/Kolkata"},
-        "end": {"dateTime": start_time, "timeZone": "Asia/Kolkata"},
+        "summary": title or "Meeting",
+        "start": {
+            "dateTime": start_dt.isoformat(),
+            "timeZone": "Asia/Kolkata"
+        },
+        "end": {
+            "dateTime": end_dt.isoformat(),
+            "timeZone": "Asia/Kolkata"
+        },
         "conferenceData": {
             "createRequest": {
                 "requestId": str(uuid.uuid4()),
-                "conferenceSolutionKey": {"type": "hangoutsMeet"}
+                "conferenceSolutionKey": {
+                    "type": "hangoutsMeet"
+                }
             }
         }
     }
 
-    # 4. Insert the event into the primary calendar
-    # conferenceDataVersion=1 is required to generate the Google Meet link
     event = service.events().insert(
         calendarId="primary",
         body=event_body,
-        conferenceDataVersion=1
+        conferenceDataVersion=1,
+        sendUpdates="all"
     ).execute()
 
-    # 5. Extract the Google Meet URL and the unique Calendar Event ID
-    meeting_link = event.get("hangoutLink")
     event_id = event.get("id")
 
-    # 6. Return both values (Recall.ai needs both to map emails)
-    return meeting_link, event_id
+    # FORCE REFRESH (Google delay fix)
+    meeting_url = extract_meet_link(event)
+
+    for _ in range(5):
+        if meeting_url:
+            break
+
+        event = service.events().get(
+            calendarId="primary",
+            eventId=event_id
+        ).execute()
+
+        meeting_url = extract_meet_link(event)
+
+    return {
+        "meeting_url": meeting_url,
+        "event_id": event_id,
+        "raw": event
+    }

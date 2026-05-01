@@ -3,8 +3,7 @@ from fastapi import APIRouter, Request
 from services.webhook_handler import handle_webhook_event
 from dotenv import load_dotenv
 
-load_dotenv()
-
+load_dotenv(override=True)
 router = APIRouter()
 
 

@@ -2,8 +2,7 @@ import requests
 from config.config import RECALL_API_KEY, BASE_URL
 from dotenv import load_dotenv
 
-load_dotenv()
-
+load_dotenv(override=True)
 
 def _headers() -> dict:
     return {

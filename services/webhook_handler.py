@@ -7,8 +7,7 @@ from services.Recall_client import get_mixed_audio_url
 from utils import store
 from dotenv import load_dotenv
 
-load_dotenv()
-
+load_dotenv(override=True)
 
 def handle_webhook_event(data: dict):
     event = data.get("event")

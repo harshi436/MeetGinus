@@ -8,8 +8,7 @@ from utils import store
 from utils.store import upsert, get
 from dotenv import load_dotenv
 
-load_dotenv()
-
+load_dotenv(override=True)
 router = APIRouter()
 
 

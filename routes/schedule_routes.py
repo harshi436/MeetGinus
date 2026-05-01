@@ -22,7 +22,7 @@ def schedule_meeting(data: ScheduleRequest):
     flow = Flow.from_client_secrets_file(
         "client_secret.json",
         scopes=SCOPES,
-        redirect_uri="NGROK_URL=https://stimulatingly-glumpier-hannelore.ngrok-free.dev/"
+        redirect_uri="NGROK_URL=https://thud-delicate-emptiness.ngrok-free.dev/"
     )
 
     # 🔥 STEP 1: FETCH TOKEN (THIS WAS MISSING)
