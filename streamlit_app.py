@@ -1,220 +1,148 @@
-# import streamlit as st
-# import requests
-
-
-# query_params = st.query_params
-
-# if "user_id" in query_params:
-#     st.session_state.user_id = query_params["user_id"]
-
-# if "email" in query_params:
-#     st.session_state.email = query_params["email"]
-
-# API_URL = "https://thud-delicate-emptiness.ngrok-free.dev/chat"
-# # LOGIN_URL = "https://thud-delicate-emptiness.ngrok-free.dev/auth/login?user_id=123"
-# LOGIN_URL = "https://thud-delicate-emptiness.ngrok-free.dev/auth/login"
-
-# st.set_page_config(page_title="AI Meeting Bot", layout="centered")
-
-# # =========================
-# # HEADER
-# # =========================
-
-# if "email" in st.session_state:
-#     st.success(f"✅ Logged in as: {st.session_state.email}")
-    
-# st.title("🤖 AI Meeting Scheduler Bot")
-
-# st.markdown("### Step 1: Login with Google")
-# st.markdown(f"[🔐 Click to Login]({LOGIN_URL})")
-
-# st.divider()
-
-# # =========================
-# # SESSION STATE
-# # =========================
-# if "chat" not in st.session_state:
-#     st.session_state.chat = []
-
-# # =========================
-# # SHOW CHAT
-# # =========================
-# for msg in st.session_state.chat:
-#     with st.chat_message(msg["role"]):
-#         st.write(msg["content"])
-
-# # =========================
-# # INPUT
-# # =========================
-# user_input = st.chat_input("Type your message")
-
-# if user_input:
-
-#     # Show user message instantly
-#     st.session_state.chat.append({"role": "user", "content": user_input})
-
-#     with st.chat_message("user"):
-#         st.write(user_input)
-
-#     try:
-#         res = requests.post(
-#             API_URL,
-#             json={
-#                 "user_id": st.session_state.get("user_id"),
-#                 "message": user_input
-#             }
-#         )
-
-#         data = res.json()
-
-#         bot_message = ""
-
-#         # ✅ Meeting link
-#         if "meeting_url" in data:
-#             bot_message += f"📅 Meeting Created!\n\n🔗 {data['meeting_url']}\n\n"
-
-#         # ✅ Main message
-#         if "message" in data:
-#             bot_message += data["message"]
-
-#         if "reply" in data:
-#             bot_message += data["reply"]
-
-#         # ✅ PDF link
-#         if "pdf_url" in data:
-#             bot_message += f"\n\n📄 [View Report]({data['pdf_url']})"
-
-#         # ✅ Error
-#         if "error" in data:
-#             bot_message = data["error"]
-
-#         if not bot_message:
-#             bot_message = "⚠️ No response from server"
-
-#     except Exception as e:
-#         bot_message = f"❌ Error: {str(e)}"
-
-#     # Save bot response
-#     st.session_state.chat.append({"role": "assistant", "content": bot_message})
-
-#     with st.chat_message("assistant"):
-#         st.write(bot_message)
-
-
 import streamlit as st
 import requests
-import uuid
-
+import os
+from dotenv import load_dotenv
+import webbrowser
+import speech_recognition as sr
+ 
 # =========================
-# CONFIG
+# LOAD ENV
 # =========================
-API_URL = "https://thud-delicate-emptiness.ngrok-free.dev/chat"
-BASE_URL = "https://thud-delicate-emptiness.ngrok-free.dev"
-
-st.set_page_config(page_title="AI Meeting Bot", layout="centered")
-
+load_dotenv()
+ 
+BASE_URL = os.getenv("NGROK_URL")
+API_URL = f"{BASE_URL}/chat"
+LOGIN_URL = f"{BASE_URL}/auth/login"
+ 
 # =========================
-# SESSION INIT
+# PAGE CONFIG
+# =========================
+st.set_page_config(page_title="Meeting Bot", layout="wide")
+ 
+# =========================
+# SESSION STATE
 # =========================
 if "user_id" not in st.session_state:
-    st.session_state.user_id = str(uuid.uuid4())
-
-if "chat" not in st.session_state:
-    st.session_state.chat = []
-
+    st.session_state.user_id = None
+ 
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+ 
+if "mode" not in st.session_state:
+    st.session_state.mode = "text"
+ 
+recognizer = sr.Recognizer()
+ 
 # =========================
-# HANDLE REDIRECT PARAMS
+# SIDEBAR
 # =========================
-query_params = st.query_params
-
-if "user_id" in query_params:
-    st.session_state.user_id = query_params["user_id"]
-
-if "email" in query_params:
-    st.session_state.email = query_params["email"]
-
+st.sidebar.title("⚙️ Settings")
+ 
+if st.sidebar.button("🔐 Login"):
+    webbrowser.open(LOGIN_URL)
+    st.sidebar.success("Login page opened!")
+ 
+user_id_input = st.sidebar.text_input("Enter User ID")
+ 
+if st.sidebar.button("✅ Confirm User"):
+    if user_id_input:
+        st.session_state.user_id = user_id_input
+        st.sidebar.success("Logged in!")
+    else:
+        st.sidebar.error("Enter valid user ID")
+ 
+# Mode selection
+mode = st.sidebar.radio("Input Mode", ["Text", "Voice"])
+st.session_state.mode = mode.lower()
+ 
 # =========================
-# LOGIN URL (FIXED)
+# MAIN UI
 # =========================
-LOGIN_URL = f"{BASE_URL}/auth/login?user_id={st.session_state.user_id}"
-
+st.title("🤖 MeetGenius")
+ 
 # =========================
-# UI HEADER
+# VOICE FUNCTION
 # =========================
-st.title("🤖 AI Meeting Scheduler Bot")
-
-if "email" in st.session_state:
-    st.success(f"✅ Logged in as: {st.session_state.email}")
-else:
-    st.markdown("### Step 1: Login with Google")
-    st.markdown(f"[🔐 Click to Login]({LOGIN_URL})")
-
-st.divider()
-
-# =========================
-# SHOW CHAT
-# =========================
-for msg in st.session_state.chat:
-    with st.chat_message(msg["role"]):
-        st.write(msg["content"])
-
-# =========================
-# INPUT (BLOCK IF NOT LOGGED IN)
-# =========================
-if "email" not in st.session_state:
-    st.warning("⚠️ Please login first to use chat")
-    st.stop()
-
-user_input = st.chat_input("Type your message")
-
-if user_input:
-
-    # Save user message
-    st.session_state.chat.append({"role": "user", "content": user_input})
-
-    with st.chat_message("user"):
-        st.write(user_input)
-
+def get_voice_input():
     try:
-        res = requests.post(
-            API_URL,
-            json={
-                "user_id": st.session_state.user_id,
-                "message": user_input
-            }
-        )
-
-        data = res.json()
-        bot_message = ""
-
-        # ✅ Meeting link
-        if "meeting_url" in data:
-            bot_message += f"📅 Meeting Created!\n\n🔗 {data['meeting_url']}\n\n"
-
-        # ✅ Main message
-        if "message" in data:
-            bot_message += data["message"]
-
-        if "reply" in data:
-            bot_message += data["reply"]
-
-        # ✅ PDF link
-        if "pdf_url" in data and data["pdf_url"]:
-            bot_message += f"\n\n📄 [View Report]({data['pdf_url']})"
-
-        # ✅ Error
-        if "error" in data:
-            bot_message = data["error"]
-
-        if not bot_message:
-            bot_message = "⚠️ No response from server"
-
-    except Exception as e:
-        bot_message = f"❌ Error: {str(e)}"
-
-    # Save bot response
-    st.session_state.chat.append({"role": "assistant", "content": bot_message})
-
-    with st.chat_message("assistant"):
-        st.write(bot_message)
-
+        with sr.Microphone() as source:
+            st.info("🎤 Listening...")
+            recognizer.adjust_for_ambient_noise(source, duration=1)
+            audio = recognizer.listen(source, timeout=10, phrase_time_limit=15)
+ 
+        text = recognizer.recognize_google(audio)
+        return text
+ 
+    except Exception:
+        st.error("Voice input failed")
+        return None
+ 
+# =========================
+# CHAT DISPLAY
+# =========================
+for chat in st.session_state.chat_history:
+    with st.chat_message(chat["role"]):
+        st.markdown(chat["content"])
+ 
+# =========================
+# INPUT SECTION
+# =========================
+if st.session_state.user_id:
+ 
+    if st.session_state.mode == "text":
+        user_input = st.chat_input("Type your message...")
+    else:
+        if st.button("🎤 Speak"):
+            user_input = get_voice_input()
+            if user_input:
+                st.success(f"You: {user_input}")
+        else:
+            user_input = None
+ 
+    if user_input:
+ 
+        # Add user message
+        st.session_state.chat_history.append({
+            "role": "user",
+            "content": user_input
+        })
+ 
+        with st.chat_message("user"):
+            st.markdown(user_input)
+ 
+        # =========================
+        # API CALL
+        # =========================
+        try:
+            res = requests.post(
+                API_URL,
+                json={
+                    "user_id": st.session_state.user_id,
+                    "message": user_input
+                },
+                timeout=60
+            )
+ 
+            response = res.json()
+            bot_msg = response.get("message", "No response")
+ 
+        except Exception as e:
+            bot_msg = f"❌ API Error: {e}"
+ 
+        # Add bot response
+        st.session_state.chat_history.append({
+            "role": "assistant",
+            "content": bot_msg
+        })
+ 
+        with st.chat_message("assistant"):
+            st.markdown(bot_msg)
+ 
+else:
+    st.warning("⚠️ Please login and enter user ID from sidebar")
+ 
+# =========================
+# CLEAR CHAT
+# =========================
+if st.sidebar.button("🗑 Clear Chat"):
+    st.session_state.chat_history = []

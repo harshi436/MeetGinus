@@ -7,6 +7,7 @@ from services.scheduler_service import start_scheduler
 from threading import Thread
 from pydantic import BaseModel
 from db.mongo import chat_collection, report_collection  # ✅ added
+from fastapi.responses import Response
 import os
 
 app = FastAPI()
@@ -109,3 +110,10 @@ def get_messages(user_id: str):
 @app.get("/")
 def root():
     return {"message": "AI Meeting Bot Running"}
+
+
+
+
+@app.get("/favicon.ico")
+def favicon():
+    return Response(status_code=204)  # "No Content" — tells browser not to bother
